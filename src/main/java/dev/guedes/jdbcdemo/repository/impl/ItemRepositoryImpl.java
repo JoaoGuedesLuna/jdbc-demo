@@ -5,6 +5,7 @@ import dev.guedes.jdbcdemo.service.ServiceFactory;
 import dev.guedes.jdbcdemo.repository.ItemRepository;
 import dev.guedes.jdbcdemo.exception.DatabaseException;
 import dev.guedes.jdbcdemo.model.Item;
+import lombok.Cleanup;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +24,7 @@ public class ItemRepositoryImpl implements ItemRepository {
     }
 
     private void insert(Item item) throws DatabaseException {
-        Connection connection = Database.getConnection();
+        @Cleanup Connection connection = Database.getConnection();
         String query = "INSERT INTO items (quantity, unit_price, product_id, order_id) VALUES (?, ?, ?, ?)";
         try (PreparedStatement statement = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
             connection.setAutoCommit(false);
@@ -32,19 +33,15 @@ public class ItemRepositoryImpl implements ItemRepository {
             statement.setLong(3, item.getProduct().getId());
             statement.setLong(4, item.getOrder().getId());
             if (statement.executeUpdate() > 0) {
-                ResultSet resultSet = statement.getGeneratedKeys();
+                @Cleanup ResultSet resultSet = statement.getGeneratedKeys();
                 if (resultSet.next()) {
                     item.setId(resultSet.getLong(1));
                 }
-                resultSet.close();
             }
             connection.commit();
-            connection.close();
-        }
-        catch (SQLException e) {
+        } catch (SQLException e) {
             try {
                 connection.rollback();
-                connection.close();
             } catch (SQLException ex) {
                 throw new DatabaseException(ex.getMessage());
             }
@@ -54,24 +51,16 @@ public class ItemRepositoryImpl implements ItemRepository {
 
     @Override
     public Optional<Item> findById(Long id) throws DatabaseException {
-        Connection connection = Database.getConnection();
+        @Cleanup Connection connection = Database.getConnection();
         String query = "SELECT * FROM items WHERE id = ?";
         Optional<Item> itemOptional = Optional.empty();
         try (PreparedStatement statement = connection.prepareStatement(query)) {
             statement.setLong(1, id);
-            ResultSet resultSet = statement.executeQuery();
+            @ Cleanup ResultSet resultSet = statement.executeQuery();
             if (resultSet.next()) {
                 itemOptional = Optional.of(this.getResultSetItem(resultSet));
             }
-            resultSet.close();
-            connection.close();
-        }
-        catch (SQLException e) {
-            try {
-                connection.close();
-            } catch (SQLException ex) {
-                throw new DatabaseException(ex.getMessage());
-            }
+        } catch (SQLException e) {
             throw new DatabaseException(e.getMessage());
         }
         return itemOptional;
@@ -79,24 +68,16 @@ public class ItemRepositoryImpl implements ItemRepository {
 
     @Override
     public List<Item> findAllByOrderId(Long orderId) throws DatabaseException {
-        Connection connection = Database.getConnection();
+        @Cleanup Connection connection = Database.getConnection();
         String query = "SELECT * FROM items WHERE order_id = ?";
         List<Item> items = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(query)) {
             statement.setLong(1, orderId);
-            ResultSet resultSet = statement.executeQuery();
+            @Cleanup ResultSet resultSet = statement.executeQuery();
             while (resultSet.next()) {
                 items.add(this.getResultSetItem(resultSet));
             }
-            resultSet.close();
-            connection.close();
-        }
-        catch (SQLException e) {
-            try {
-                connection.close();
-            } catch (SQLException ex) {
-                throw new DatabaseException(ex.getMessage());
-            }
+        } catch (SQLException e) {
             throw new DatabaseException(e.getMessage());
         }
         return items;
@@ -104,19 +85,16 @@ public class ItemRepositoryImpl implements ItemRepository {
 
     @Override
     public void delete(Item item) throws DatabaseException {
-        Connection connection = Database.getConnection();
+        @Cleanup Connection connection = Database.getConnection();
         String query = "DELETE FROM items WHERE id = ?";
         try (PreparedStatement statement = connection.prepareStatement(query)) {
             connection.setAutoCommit(false);
             statement.setLong(1,item.getId());
             statement.executeUpdate();
             connection.commit();
-            connection.close();
-        }
-        catch (SQLException e){
+        } catch (SQLException e){
             try {
                 connection.rollback();
-                connection.close();
             } catch (SQLException ex) {
                 throw new DatabaseException(ex.getMessage());
             }
